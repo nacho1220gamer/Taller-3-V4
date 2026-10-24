@@ -58,7 +58,7 @@
     (espacio (whitespace) skip)
     (comentario ("//" (arbno (not #\newline))) skip)
     (identificador ("@" letter (arbno (or letter digit "?"))) symbol)
-    (texto (letter (arbno (or letter digit "_"))) symbol)
+    (texto (letter (arbno (or letter digit "_"))) string)
     (numero (digit (arbno digit)) number)
     (numero ("-" digit (arbno digit)) number)
     (numero (digit (arbno digit) "." digit (arbno digit)) number)
@@ -75,7 +75,14 @@
     (expresion ( "\"" texto "\"") texto-lit)
     (expresion (identificador) var-exp)
     (expresion ( "(" expresion primitiva-binaria expresion ")")  primapp-bin-exp)
-    (expresion (primitiva-unaria expresion) primapp-un-exp)
+    (expresion (primitiva-unaria "(" expresion ")") primapp-un-exp)
+    (expresion ("Si" expresion "{" expresion  "}" "sino" "{" expresion "}")
+                condicional-exp)
+    (expresion ("declarar" "(" (arbno identificador "=" expresion ";") ")" "{" expresion "}")
+               variableLocal-exp)
+    (expresion ("procedimiento" "(" (separated-list identificador ",") ")" "{" expresion "}")
+               procedimiento-exp)
+    
     (primitiva-binaria ("+") primitiva-suma)
     (primitiva-binaria ("~") primitiva-resta)
     (primitiva-binaria ("/") primitiva-div)
@@ -144,6 +151,14 @@
                        (aplicar-primitiva-binaria(evaluar-expresion rand1 env) prim (evaluar-expresion rand2 env)))
       (primapp-un-exp (prim exp)
                       (aplicar-primitiva-unaria prim (evaluar-expresion exp env)))
+      (condicional-exp (test-exp true-exp false-exp)
+                       (if (valor-verdad? (evaluar-expresion test-exp env))
+                           (evaluar-expresion true-exp env)
+                           (evaluar-expresion false-exp env)))
+      (variableLocal-exp (ids exps cuerpo)
+                         (evaluar-expresion cuerpo (extend-env ids (evaluar-lista-expresiones exps env) env)))
+      (procedimiento-exp (ids cuerpo)
+                         (cerradura ids cuerpo env))
       )))
 
 ;apicar-primitiva-binaria: funcion que aplica la primitiva binaria correspondiente a un par de expresiones
@@ -156,12 +171,12 @@
       (primitiva-div () (/ arg1 arg2))
       (primitiva-multi () (* arg1 arg2))
       (primitiva-concat () (string-append arg1 arg2))
-      (primitiva-mayor () (> arg1 arg2))
-      (primitiva-menor () (< arg1 arg2))
-      (primitiva-mayor-igual () (>=  arg1 arg2))
-      (primitiva-menor-igual () (<= arg1 arg2))
-      (primitiva-diferente () (not (equal? arg1 arg2)))
-      (primitiva-comparador-igual () (equal? arg1 arg2))
+      (primitiva-mayor () (if (> arg1 arg2) 1 0))
+      (primitiva-menor () (if (< arg1 arg2) 1 0))
+      (primitiva-mayor-igual () (if (>=  arg1 arg2) 1 0))
+      (primitiva-menor-igual () (if (<= arg1 arg2) 1 0))
+      (primitiva-diferente () (if (not (equal? arg1 arg2)) 1 0))
+      (primitiva-comparador-igual () (if (equal? arg1 arg2) 1 0))
       )))
 
 
@@ -179,7 +194,9 @@
 
 
 ;Funciones de ambientes
-
+(define valor-verdad?
+  (lambda (cond)
+    (not (zero? cond))))
 
 ;Ambiente Inicial
 
@@ -197,6 +214,13 @@
   (extended-env-record (simbolos (list-of symbol?))
                        (valores (list-of scheme-value?))
                        (env environment?)))
+
+;definición del tipo de dato procVal (closure/cerradura)
+(define-datatype procVal procVal?
+  (cerradura
+   (lista-ID (list-of symbol?))
+   (exp expresion?)
+   (amb environment?)))
 
 (define scheme-value? (lambda (v) #t))
 
@@ -256,3 +280,13 @@
       )
     )
   )
+
+;evaluar-lista-expresiones: funcion auxiliar que evalua cada expresion de una lista en el ambiente dado
+;y retorna la lista de los valores resultantes
+
+(define evaluar-lista-expresiones
+  (lambda (lista-exps env)
+    (cond
+      ((null? lista-exps) '())
+      (else (cons (evaluar-expresion (car lista-exps) env)
+                  (evaluar-lista-expresiones (cdr lista-exps) env))))))
