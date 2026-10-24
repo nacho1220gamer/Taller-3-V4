@@ -80,6 +80,9 @@
                 condicional-exp)
     (expresion ("declarar" "(" (arbno identificador "=" expresion ";") ")" "{" expresion "}")
                variableLocal-exp)
+    (expresion ("procedimiento" "(" (separated-list identificador ",") ")" "{" expresion "}")
+               procedimiento-exp)
+    
     (primitiva-binaria ("+") primitiva-suma)
     (primitiva-binaria ("~") primitiva-resta)
     (primitiva-binaria ("/") primitiva-div)
@@ -153,7 +156,9 @@
                            (evaluar-expresion true-exp env)
                            (evaluar-expresion false-exp env)))
       (variableLocal-exp (ids exps cuerpo)
-                         (evaluar-expresion cuerpo ()))
+                         (evaluar-expresion cuerpo (extend-env ids (evaluar-lista-expresiones exps env) env)))
+      (procedimiento-exp (ids cuerpo)
+                         (cerradura ids cuerpo env))
       )))
 
 ;apicar-primitiva-binaria: funcion que aplica la primitiva binaria correspondiente a un par de expresiones
@@ -209,6 +214,13 @@
   (extended-env-record (simbolos (list-of symbol?))
                        (valores (list-of scheme-value?))
                        (env environment?)))
+
+;definición del tipo de dato procVal (closure/cerradura)
+(define-datatype procVal procVal?
+  (cerradura
+   (lista-ID (list-of symbol?))
+   (exp expresion?)
+   (amb environment?)))
 
 (define scheme-value? (lambda (v) #t))
 
@@ -268,3 +280,13 @@
       )
     )
   )
+
+;evaluar-lista-expresiones: funcion auxiliar que evalua cada expresion de una lista en el ambiente dado
+;y retorna la lista de los valores resultantes
+
+(define evaluar-lista-expresiones
+  (lambda (lista-exps env)
+    (cond
+      ((null? lista-exps) '())
+      (else (cons (evaluar-expresion (car lista-exps) env)
+                  (evaluar-lista-expresiones (cdr lista-exps) env))))))
