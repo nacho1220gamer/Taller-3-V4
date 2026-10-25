@@ -17,7 +17,13 @@
 ;;             
 ;;             := (<expresion> <primitiva-binaria> <expresion>)
 ;;             primapp-bin-exp (exp1 prim-binaria exp2)
-;;             
+;;
+;;             := "evaluar" <expresion> "(" {<expresion>}*(",") ")" "finEval"
+;;             app-exp (exp exps)
+;;
+;;             := "recursivo" "(" {<identificador> "(" {<identificador>}*(",") ")" "=" <expresion> ";"}* ")" "{" <expresion> "}"
+;;             recursivo-exp (ids lista-ID exps cuerpo)
+;;
 ;;             := <primitiva-unaria> (<expresion>)
 ;;             primapp-un-exp (prim-unaria exp) 
 ;;             
@@ -80,6 +86,15 @@
                 condicional-exp)
     (expresion ("declarar" "(" (arbno identificador "=" expresion ";") ")" "{" expresion "}")
                variableLocal-exp)
+    (expresion ("procedimiento" "(" (separated-list identificador ",") ")" "{" expresion "}")
+               procedimiento-exp)
+        (expresion ("recursivo" "("
+                (arbno identificador "(" (separated-list identificador ",") ")" "=" expresion ";")
+                ")" "{" expresion "}")
+               recursivo-exp)
+            (expresion ("evaluar" expresion "(" (separated-list expresion ",") ")" "finEval")
+               app-exp)
+    
     (primitiva-binaria ("+") primitiva-suma)
     (primitiva-binaria ("~") primitiva-resta)
     (primitiva-binaria ("/") primitiva-div)
@@ -153,7 +168,19 @@
                            (evaluar-expresion true-exp env)
                            (evaluar-expresion false-exp env)))
       (variableLocal-exp (ids exps cuerpo)
-                         (evaluar-expresion cuerpo ()))
+                         (evaluar-expresion cuerpo (extend-env ids (evaluar-lista-expresiones exps env) env)))
+      (procedimiento-exp (ids cuerpo)
+                         (cerradura ids cuerpo env))
+         
+      ;;Punto 7
+      (app-exp (exp exps)
+               (cases procVal (evaluar-expresion exp env)
+                 (cerradura (lista-ID cuerpo amb)
+                            (evaluar-expresion cuerpo
+                                               (extend-env lista-ID (evaluar-lista-expresiones exps env)amb)))))
+      ;;Punto 8
+      (recursivo-exp (ids lista-ID exps cuerpo)
+                     (evaluar-expresion cuerpo (extend-env-rec ids lista-ID exps env)))
       )))
 
 ;apicar-primitiva-binaria: funcion que aplica la primitiva binaria correspondiente a un par de expresiones
@@ -208,7 +235,18 @@
   (empty-env-record)
   (extended-env-record (simbolos (list-of symbol?))
                        (valores (list-of scheme-value?))
-                       (env environment?)))
+                       (env environment?))
+  (extended-rec-env-record (simbolos (list-of symbol?))
+                           (lista-ID (list-of (list-of symbol?)))
+                           (exps (list-of expresion?))
+                           (env environment?)))
+
+;definición del tipo de dato procVal (closure/cerradura)
+(define-datatype procVal procVal?
+  (cerradura
+   (lista-ID (list-of symbol?))
+   (exp expresion?)
+   (amb environment?)))
 
 (define scheme-value? (lambda (v) #t))
 
@@ -226,8 +264,15 @@
   (lambda (simbolos vals env)
     (extended-env-record simbolos vals env)))
 
+;;función que crea un ambiente extendido para procedimeintos que hagan uso de recursividad
+
+(define extend-env-rec
+  (lambda (simbolos lista-ID exps env)
+    (extended-rec-env-record simbolos lista-ID exps env)))
+
 
 ;buscar-variable: funcion que busca una variable en un ambiente
+
 
 (define buscar-variable
   (lambda (identificador env)
@@ -239,10 +284,16 @@
                              (if (number? posicion)
                                  (list-ref valores posicion)
                                  (buscar-variable identificador env))))
+      (extended-rec-env-record (simbolos lista-ID exps amb)
+                               (let ((posicion (encontrar-posicion-lista identificador simbolos)))
+                                 (if (number? posicion)
+                                     (cerradura (list-ref lista-ID posicion)
+                                                (list-ref exps posicion)
+                                                env)
+                                     (buscar-variable identificador amb))))
       )
     )
   )
-
 
 
 ;funciones auxiliares para hallar la posición de un símbolo (identificador) en la
@@ -268,3 +319,13 @@
       )
     )
   )
+
+;evaluar-lista-expresiones: funcion auxiliar que evalua cada expresion de una lista en el ambiente dado
+;y retorna la lista de los valores resultantes
+
+(define evaluar-lista-expresiones
+  (lambda (lista-exps env)
+    (cond
+      ((null? lista-exps) '())
+      (else (cons (evaluar-expresion (car lista-exps) env)
+                  (evaluar-lista-expresiones (cdr lista-exps) env))))))
