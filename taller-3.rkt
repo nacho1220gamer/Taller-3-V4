@@ -64,7 +64,7 @@
     (espacio (whitespace) skip)
     (comentario ("//" (arbno (not #\newline))) skip)
     (identificador ("@" letter (arbno (or letter digit "?"))) symbol)
-    (texto (letter (arbno (or letter digit "_"))) string)
+    (texto (letter (arbno (or letter digit "_" ":"))) string)
     (numero (digit (arbno digit)) number)
     (numero ("-" digit (arbno digit)) number)
     (numero (digit (arbno digit) "." digit (arbno digit)) number)
@@ -403,4 +403,31 @@ recursivo (
   evaluar @multiplicar(4,3) finEval
 }
 |#
+
+;; -----------------------------------------------------------------------------
+;; Ejercicio e)@integrantes @saludar @decorate
+;; Descripción: @integrantes Retorna un string con los nombres ed los integrantes del grupo
+;;              @saludar Recibe un procedimiento y retorna otro que le antepone el texto
+;;              "Hola:" al resultado del procedimiento que recibió
+;;              @decorate Procedimiento decorado
+;; Ejemplo: evaluar @decorate () finEval -> Retorna "Hola:Ignacio_Samuel_Alejandro_y_Fernando"
+;; -----------------------------------------------------------------------------
+#|
+
+declarar (
+  @integrantes = procedimiento () { "Ignacio_Samuel_Alejandro_y_Fernando" };
+  @saludar = procedimiento (@f) {
+    procedimiento () {
+      ("Hola:" concat evaluar  @f() finEval)
+    }
+  };
+) {
+  declarar (
+     @decorate = evaluar @saludar (@integrantes) finEval;
+) {
+  evaluar @decorate () finEval
+  }
+}
+|#
+
 
