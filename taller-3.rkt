@@ -273,8 +273,6 @@
 
 ;buscar-variable: funcion que busca una variable en un ambiente
 
-;buscar-variable: funcion que busca una variable en un ambiente; si el nombre esta en una capa
-;recursiva, construye la cerradura usando esa misma capa como ambiente para permitir recursion
 
 (define buscar-variable
   (lambda (identificador env)
