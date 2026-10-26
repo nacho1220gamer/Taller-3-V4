@@ -1,5 +1,12 @@
 #lang eopl
 
+;;
+;;Ignacio Henao Henao 2438110
+;;Juan Fernando Marmolejo Valencia 2437661
+;;Samuel  Saldaña  Giraldo 2437631 
+;;Alejandro Cardona Arellano 2439107
+;;https://github.com/nacho1220gamer/Taller-3-V4.git
+
 
 ;;definicion BNF para las expresiones del lenguaje:
 ;;
@@ -148,39 +155,41 @@
   (lambda (pgm)
     (cases programa pgm
       (un-programa (cuerpo)
-                   (evaluar-expresion cuerpo (init-env))))))
+                   (evaluar-expresion cuerpo (ambiente-inicial))))))
 
 
 ;evaluar-expresion: funcion que evalua la expresion en el ambiente dado
 
 (define evaluar-expresion
-  (lambda (exp env)
+  (lambda (exp amb)
     (cases expresion exp
       (numero-lit (dato) dato)
       (texto-lit (txt) txt)
-      (var-exp (id) (buscar-variable id env))
+      (var-exp (id) (buscar-variable id amb))
       (primapp-bin-exp (rand1 prim rand2)
-                       (aplicar-primitiva-binaria(evaluar-expresion rand1 env) prim (evaluar-expresion rand2 env)))
+                       (aplicar-primitiva-binaria(evaluar-expresion rand1 amb) prim (evaluar-expresion rand2 amb)))
       (primapp-un-exp (prim exp)
-                      (aplicar-primitiva-unaria prim (evaluar-expresion exp env)))
+                      (aplicar-primitiva-unaria prim (evaluar-expresion exp amb)))
       (condicional-exp (test-exp true-exp false-exp)
-                       (if (valor-verdad? (evaluar-expresion test-exp env))
-                           (evaluar-expresion true-exp env)
-                           (evaluar-expresion false-exp env)))
+                       (if (valor-verdad? (evaluar-expresion test-exp amb))
+                           (evaluar-expresion true-exp amb)
+                           (evaluar-expresion false-exp amb)))
       (variableLocal-exp (ids exps cuerpo)
-                         (evaluar-expresion cuerpo (extend-env ids (evaluar-lista-expresiones exps env) env)))
+                         (evaluar-expresion cuerpo (ambiente-extendido ids (evaluar-lista-expresiones exps amb) amb)))
       (procedimiento-exp (ids cuerpo)
-                         (cerradura ids cuerpo env))
+                         (cerradura ids cuerpo amb))
          
       ;;Punto 7
-      (app-exp (exp exps)
-               (cases procVal (evaluar-expresion exp env)
-                 (cerradura (lista-ID cuerpo amb)
+            (app-exp (exp exps)
+               (cases procVal (evaluar-expresion exp amb)
+                 (cerradura (lista-ID cuerpo amb-cerradura)
                             (evaluar-expresion cuerpo
-                                               (extend-env lista-ID (evaluar-lista-expresiones exps env)amb)))))
+                                               (ambiente-extendido lista-ID
+                                                                   (evaluar-lista-expresiones exps amb)
+                                                                   amb-cerradura)))))
       ;;Punto 8
       (recursivo-exp (ids lista-ID exps cuerpo)
-                     (evaluar-expresion cuerpo (extend-env-rec ids lista-ID exps env)))
+                     (evaluar-expresion cuerpo (ambiente-extendido-recursivo ids lista-ID exps amb)))
       )))
 
 ;apicar-primitiva-binaria: funcion que aplica la primitiva binaria correspondiente a un par de expresiones
@@ -214,86 +223,85 @@
       )))
 
 
-
-;Funciones de ambientes
+;valor-verdad
 (define valor-verdad?
   (lambda (cond)
     (not (zero? cond))))
 
+;Funciones de ambientes
+
 ;Ambiente Inicial
 
-(define init-env
+(define ambiente-inicial
   (lambda ()
-    (extend-env
+    (ambiente-extendido
      '(@a @b @c @d @e)
      '(1 2 3 "hola" "FLP")
-     (empty-env))))
+     (ambiente-vacio))))
     
 
 ;definición del tipo de dato ambiente
-(define-datatype environment environment?
-  (empty-env-record)
-  (extended-env-record (simbolos (list-of symbol?))
+(define-datatype ambiente ambiente?
+  (registro-ambiente-vacio)
+  (registro-ambiente-extendido (simbolos (list-of symbol?))
                        (valores (list-of scheme-value?))
-                       (env environment?))
-  (extended-rec-env-record (simbolos (list-of symbol?))
+                       (amb ambiente?))
+  (registro-ambiente-extendido-recursivo (simbolos (list-of symbol?))
                            (lista-ID (list-of (list-of symbol?)))
                            (exps (list-of expresion?))
-                           (env environment?)))
+                           (amb ambiente?)))
 
 ;definición del tipo de dato procVal (closure/cerradura)
 (define-datatype procVal procVal?
   (cerradura
    (lista-ID (list-of symbol?))
    (exp expresion?)
-   (amb environment?)))
+   (amb ambiente?)))
 
 (define scheme-value? (lambda (v) #t))
 
 
 ;función que crea un ambiente vacío
 
-(define empty-env  
+(define ambiente-vacio  
   (lambda ()
-    (empty-env-record))) 
+    (registro-ambiente-vacio))) 
 
 
 ;función que crea un ambiente extendido
 
-(define extend-env
-  (lambda (simbolos vals env)
-    (extended-env-record simbolos vals env)))
+(define ambiente-extendido
+  (lambda (simbolos vals amb)
+    (registro-ambiente-extendido simbolos vals amb)))
 
 ;;función que crea un ambiente extendido para procedimeintos que hagan uso de recursividad
 
-(define extend-env-rec
-  (lambda (simbolos lista-ID exps env)
-    (extended-rec-env-record simbolos lista-ID exps env)))
+(define ambiente-extendido-recursivo
+  (lambda (simbolos lista-ID exps amb)
+    (registro-ambiente-extendido-recursivo simbolos lista-ID exps amb)))
 
 
 ;buscar-variable: funcion que busca una variable en un ambiente
 
 
 (define buscar-variable
-  (lambda (identificador env)
-    (cases environment env
-      (empty-env-record ()
-                        (eopl:error 'apply-env "Error, la variable" identificador "no existe"))
-      (extended-env-record (identificadores valores env)
-                           (let ((posicion (encontrar-posicion-lista identificador identificadores)))
-                             (if (number? posicion)
-                                 (list-ref valores posicion)
-                                 (buscar-variable identificador env))))
-      (extended-rec-env-record (simbolos lista-ID exps amb)
-                               (let ((posicion (encontrar-posicion-lista identificador simbolos)))
-                                 (if (number? posicion)
-                                     (cerradura (list-ref lista-ID posicion)
-                                                (list-ref exps posicion)
-                                                env)
-                                     (buscar-variable identificador amb))))
-      )
-    )
-  )
+  (lambda (identificador amb)
+    (cases ambiente amb
+      (registro-ambiente-vacio ()
+        (eopl:error 'buscar-variable "Error, la variable ~s no existe" identificador))
+      (registro-ambiente-extendido (identificadores valores amb-anterior)
+        (let ((posicion (encontrar-posicion-lista identificador identificadores)))
+          (if (number? posicion)
+              (list-ref valores posicion)
+              (buscar-variable identificador amb-anterior))))
+      (registro-ambiente-extendido-recursivo (simbolos lista-ID exps amb-anterior)
+        (let ((posicion (encontrar-posicion-lista identificador simbolos)))
+          (if (number? posicion)
+              (cerradura (list-ref lista-ID posicion)
+                         (list-ref exps posicion)
+                         amb)
+              (buscar-variable identificador amb-anterior))))
+      )))
 
 
 ;funciones auxiliares para hallar la posición de un símbolo (identificador) en la
@@ -324,11 +332,11 @@
 ;y retorna la lista de los valores resultantes
 
 (define evaluar-lista-expresiones
-  (lambda (lista-exps env)
+  (lambda (lista-exps amb)
     (cond
       ((null? lista-exps) '())
-      (else (cons (evaluar-expresion (car lista-exps) env)
-                  (evaluar-lista-expresiones (cdr lista-exps) env))))))
+      (else (cons (evaluar-expresion (car lista-exps) amb)
+                  (evaluar-lista-expresiones (cdr lista-exps) amb))))))
 
 ;; Utilización del lenguaje de programación
 ;; -----------------------------------------------------------------------------
@@ -404,6 +412,39 @@ recursivo (
 }
 |#
 
+
+;; -----------------------------------------------------------------------------
+;; Ejercicio d)@sumaParesRango(a, b)
+;; Descripción: Calcula la sume los números pares en un rango de valores positivos 
+;; [a,b] donde a < b
+;; Ejemplo: evaluar @sumaParesRango (2, 7) finEval -> Retorna 12
+;; -----------------------------------------------------------------------------
+#|
+recursivo (
+  @CuantasVecesCabe2(@x) = 
+    Si (@x < 2) {
+      0
+    } sino {
+      (1 + evaluar @CuantasVecesCabe2((@x ~ 2)) finEval)
+    };
+  @residuo2(@x) =
+    (@x ~ (2 * evaluar @CuantasVecesCabe2(@x) finEval))
+   ;
+  @sumaParesRango(@a, @b) = 
+  Si (@a < @b) {
+     Si (evaluar @residuo2(@a) finEval == 0){
+       (@a + evaluar @sumaParesRango(add1(@a), @b) finEval)
+     } sino  {
+       (0 + evaluar @sumaParesRango(add1(@a), @b) finEval)
+        }
+  }
+  sino {0};
+) {
+evaluar @sumaParesRango(2,7) finEval
+}
+
+|#
+
 ;; -----------------------------------------------------------------------------
 ;; Ejercicio e)@integrantes @saludar @decorate
 ;; Descripción: @integrantes Retorna un string con los nombres ed los integrantes del grupo
@@ -457,4 +498,3 @@ declarar (
 
 
 |#
-
