@@ -64,7 +64,7 @@
     (espacio (whitespace) skip)
     (comentario ("//" (arbno (not #\newline))) skip)
     (identificador ("@" letter (arbno (or letter digit "?"))) symbol)
-    (texto (letter (arbno (or letter digit "_"))) string)
+    (texto ((or letter "_") (arbno (or letter digit "_" ":"))) string)
     (numero (digit (arbno digit)) number)
     (numero ("-" digit (arbno digit)) number)
     (numero (digit (arbno digit) "." digit (arbno digit)) number)
@@ -88,11 +88,11 @@
                variableLocal-exp)
     (expresion ("procedimiento" "(" (separated-list identificador ",") ")" "{" expresion "}")
                procedimiento-exp)
-        (expresion ("recursivo" "("
+    (expresion ("recursivo" "("
                 (arbno identificador "(" (separated-list identificador ",") ")" "=" expresion ";")
                 ")" "{" expresion "}")
                recursivo-exp)
-            (expresion ("evaluar" expresion "(" (separated-list expresion ",") ")" "finEval")
+    (expresion ("evaluar" expresion "(" (separated-list expresion ",") ")" "finEval")
                app-exp)
     
     (primitiva-binaria ("+") primitiva-suma)
@@ -329,3 +329,132 @@
       ((null? lista-exps) '())
       (else (cons (evaluar-expresion (car lista-exps) env)
                   (evaluar-lista-expresiones (cdr lista-exps) env))))))
+
+;; Utilización del lenguaje de programación
+;; -----------------------------------------------------------------------------
+;; Ejercicio a) @sumarDigitos(n)
+;; Descripción: Suma los dígitos de un número entero positivo.
+;; Ejemplo: evaluar @sumarDigitos(147) finEval -> Retorna 12
+;; -----------------------------------------------------------------------------
+#|
+recursivo (
+  @div10(@x) = 
+    Si (@x < 10) {
+      0
+    } sino {
+      (1 + evaluar @div10((@x ~ 10)) finEval)
+    };
+  @sumarDigitos(@n) = 
+    Si (@n == 0) {
+      0
+    } sino {
+      declarar (
+        @div = evaluar @div10(@n) finEval;
+      ) {
+        declarar (
+          @ultimo = (@n ~ (10 * @div));
+        ) {
+          (@ultimo + evaluar @sumarDigitos(@div) finEval)
+        }
+      }
+    };
+) {
+  evaluar @sumarDigitos(147) finEval
+}
+|#
+
+
+;; -----------------------------------------------------------------------------
+;; Ejercicio b)@sumaNaturales(n)
+;; Descripción: Calcula la suma de los primeros n enteros positivos.
+;; Ejemplos: evaluar @sumaNaturales(5) finEval -> Retorna 15
+;;           evaluar @sumaNaturales(10) finEval -> Retorna 55
+;; -----------------------------------------------------------------------------
+#|
+recursivo (
+  @sumaNaturales(@n) = 
+    Si (@n == 0) {
+      0
+    } sino {
+      (@n + evaluar @sumaNaturales(sub1(@n)) finEval)
+    };
+) {
+  evaluar @sumaNaturales(5) finEval
+}
+Ejemplo-alt: evaluar @sumaNaturales(10) finEval
+|#
+
+
+;; -----------------------------------------------------------------------------
+;; Ejercicio c)@multiplicar(a, b)
+;; Descripción: Calcula el producto de dos enteros no negativos mediante sumas 
+;;              sucesivas.
+;; Ejemplo: evaluar @multiplicar(4, 3) finEval -> Retorna 12
+;; -----------------------------------------------------------------------------
+#|
+recursivo (
+  @multiplicar(@a, @b) = 
+    Si (@a == 0) {
+      0
+    } sino {
+      (@b + evaluar @multiplicar(sub1(@a), @b) finEval)
+    };
+) {
+  evaluar @multiplicar(4,3) finEval
+}
+|#
+
+;; -----------------------------------------------------------------------------
+;; Ejercicio e)@integrantes @saludar @decorate
+;; Descripción: @integrantes Retorna un string con los nombres ed los integrantes del grupo
+;;              @saludar Recibe un procedimiento y retorna otro que le antepone el texto
+;;              "Hola:" al resultado del procedimiento que recibió
+;;              @decorate Procedimiento decorado
+;; Ejemplo: evaluar @decorate () finEval -> Retorna "Hola:Ignacio_Samuel_Alejandro_y_Fernando"
+;; -----------------------------------------------------------------------------
+#|
+
+declarar (
+  @integrantes = procedimiento () { "Ignacio_Samuel_Alejandro_y_Fernando" };
+  @saludar = procedimiento (@f) {
+    procedimiento () {
+      ("Hola:" concat evaluar  @f() finEval)
+    }
+  };
+) {
+  declarar (
+     @decorate = evaluar @saludar (@integrantes) finEval;
+) {
+  evaluar @decorate () finEval
+  }
+}
+|#
+;-------------------------------------------------------------------------------
+;; Ejercicio f) @integrantes @saludar @decorate (con mensaje adicional)
+;; Descripción: @integrantes retorna un string con los nombres de los integrantes.
+;;              @saludar recibe un procedimiento @f y retorna otro procedimiento que
+;;              ahora si recibe un parámetro @msg: antepone "Hola:" al resultado de
+;;              invocar @f y agrega @msg al final del string.
+;;              @decorate es el procedimiento decorado resultante.
+;; Ejemplo: evaluar @decorate ("_EstudiantesFLP") finEval-> Retorna "Hola:Ignacio_Samuel_Alejandro_y_Fernando_EstudiantesFLP"
+;-------------------------------------------------------------------------------
+#|
+
+declarar (
+  @integrantes = procedimiento () { "Ignacio_Samuel_Alejandro_y_Fernando" };
+  @saludar = procedimiento (@f) {
+    procedimiento (@msg){
+      (("Hola:" concat evaluar @f() finEval) concat @msg)
+    }
+  };
+) {
+  declarar (
+   @decorate = evaluar @saludar (@integrantes) finEval;
+  ){
+   evaluar @decorate ("_EstudiantesFLP")finEval
+  }
+}
+
+
+|#
+
